@@ -138,7 +138,7 @@ void printevects(struct mtx *M) {
     for (r = 0; r < (M->dim); r++) {
         for (c = 0; c < (M->dim); c++) {
             printf(
-                "%.2le ", (M->val)[r + c * M->dim]);
+                "%7.4f ", (M->val)[r + c * M->dim]);
         }
         printf(
             "\n");
@@ -582,6 +582,11 @@ double vdw(system_t *system) {
     struct mtx *Cm;                  //C_matrix (we use single pointer due to LAPACK requirements)
     double *eigvals;                 //eigenvales
     double fh_corr, lr_corr;
+    FILE *feigvects, *feigvals;
+    feigvects = fopen("eigvects.dat","w");
+    feigvals = fopen("eigvals.dat","w");
+    int fclose( FILE *fp );
+    int fputc( int c, FILE *fp );
 
     N = system->natoms;
 
@@ -597,7 +602,20 @@ double vdw(system_t *system) {
     //setup and use lapack diagonalization routine dsyev_()
     eigvals = lapack_diag(Cm, system->polarvdw);  //eigenvectors if system->polarvdw == 2
     if (system->polarvdw == 2)
+    {
         printevects(Cm);
+
+        for (int k = 0; k < 3*N; k++)
+            fprintf(feigvals,"%f ", eigvals[k]);
+        fprintf(feigvals,"\n");
+
+	for (int r = 0; r < (Cm->dim); r++) {
+            for (int c = 0; c < (Cm->dim); c++)
+                fprintf(feigvects, "%7.4f ", (Cm->val)[r + c * Cm->dim]);
+            fprintf(feigvects, "\n");
+	}
+	
+    }
 
     //return energy in inverse time (a.u.) units
     e_total = eigen2energy(eigvals, Cm->dim, system->temperature);

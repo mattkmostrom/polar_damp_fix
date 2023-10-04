@@ -1,6 +1,5 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <stdbool.h>
 #include <string.h>
 #include <mc.h>
 
@@ -8,8 +7,6 @@ typedef struct {
     double *abInitioEnergy;
     double *fitEnergy, *lastFitEnergy;
     molecule_t **molecules;
-    bool *periodic;
-    pbc_t **pbc;
     int nConfigs;
 } multiConfigData_t;
 
@@ -32,6 +29,7 @@ void undo_multi_params(multiParamData_t *, multiConfigData_t *);
 
 void read_multi_configs(system_t *, multiConfigData_t *, multiParamData_t *);
 void perturb_multi_params(system_t *, multiParamData_t *);
+double energy_multi_fit(system_t *);
 double calc_multi_configurational_energy(system_t *);
 double calc_multi_error(system_t *, multiConfigData_t *);
 void output_multi_params(double, double, multiParamData_t *, system_t *, molecule_t *, multiConfigData_t *);

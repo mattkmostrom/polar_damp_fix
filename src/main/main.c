@@ -133,7 +133,7 @@ int main(int argc, char **argv) {
     output(linebuf);
 
     /* read the input files and setup the simulation */
-    system = setup_system(input_file, argv);
+    system = setup_system(input_file);
     if (!system) {
         error(
             "MAIN: could not initialize the simulation\n");

@@ -175,4 +175,5 @@ double axilrod_teller(system_t* system) {
     // We're counting each pair 6 times
     potential = potential / 6;
     return potential;
+    printf("Axilrod energy: %lf \n", potential);
 }

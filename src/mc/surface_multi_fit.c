@@ -1,7 +1,7 @@
 #include <stdbool.h>
 #include <surface_multi_fit.h>
 
-// Copyright Adam Hogan 2016-2021 - GNU GPL v3
+// Copyright Adam Hogan 2016-2019 - GNU GPL v3
 
 void load_initial_multi_params(system_t *system, multiParamData_t *params) {
     // The PQR input file should have one atom per atom type with the initial parameters
@@ -147,6 +147,18 @@ void undo_multi_params(multiParamData_t *params, multiConfigData_t *configs) {
     return;
 }
 
+/*
+typedef struct {
+    double *abInitioEnergy;
+    double *fitEnergy, *lastFitEnergy;
+    molecule_t **molecules;
+    int nConfigs;
+} multiConfigData_t;
+
+            params->atomtype[i] = calloc(MAXLINE,sizeof(char));
+            memnullcheck(params->atomtype[i],MAXLINE*sizeof(char), __LINE__-1, __FILE__);
+*/
+
 void read_multi_configs(system_t *system, multiConfigData_t *configs, multiParamData_t *params) {
     /*
     config input format, any number of following with newlines separating:
@@ -154,6 +166,7 @@ void read_multi_configs(system_t *system, multiConfigData_t *configs, multiParam
     line 1: single double with no whitespace, the ab initio energy
     line 2-N+2: any number of atoms, which consist of a string, int, double, double, double, double
         where the first string is the atomtype, first int is the molecule #, followed by the x, y and z positions and finally the charge
+    Note: only 2 or 3 molecules allowed for now
     */
     char *filename = system->multi_fit_input;
     FILE *fp = fopen(filename, "r");
@@ -187,6 +200,13 @@ void read_multi_configs(system_t *system, multiConfigData_t *configs, multiParam
         }
     }
 
+    /*typedef struct {
+    double *abInitioEnergy;
+    double *fitEnergy, *lastFitEnergy;
+    molecule_t **molecules;
+    int nConfigs;
+} multiConfigData_t;*/
+
     configs->abInitioEnergy = calloc(configs->nConfigs, sizeof(double));
     memnullcheck(configs->abInitioEnergy, configs->nConfigs * sizeof(double), __LINE__ - 1, __FILE__);
     configs->fitEnergy = calloc(configs->nConfigs, sizeof(double));
@@ -195,22 +215,12 @@ void read_multi_configs(system_t *system, multiConfigData_t *configs, multiParam
     memnullcheck(configs->lastFitEnergy, configs->nConfigs * sizeof(double), __LINE__ - 1, __FILE__);
     configs->molecules = calloc(configs->nConfigs, sizeof(molecule_t *));
     memnullcheck(configs->molecules, configs->nConfigs * sizeof(molecule_t *), __LINE__ - 1, __FILE__);
-    configs->periodic = calloc(configs->nConfigs, sizeof(int));
-    memnullcheck(configs->periodic, configs->nConfigs * sizeof(int), __LINE__ - 1, __FILE__);
-    configs->pbc = calloc(configs->nConfigs, sizeof(pbc_t *));
-    memnullcheck(configs->pbc, configs->nConfigs * sizeof(pbc_t *), __LINE__ - 1, __FILE__);
-    int i, j, k;
-    for (i=0;i<configs->nConfigs;i++)
-    {
-        configs->pbc[i] = calloc(1, sizeof(pbc_t));
-        memnullcheck(configs->pbc[i], 1 * sizeof(pbc_t), __LINE__ - 1, __FILE__);
-    }
 
-    i = -1;
+    int i = -1, j, k;
     rewind(fp);
     while (fgets(line, sizeof(line), fp)) {
         token = strtok(line, s);
-        if (strcmp("Configuration", token) == 0) {
+        if (strcmp("Configuration", token) == 0.0) {
             // Setup new molecule linked list here
             i++;
             configs->molecules[i] = calloc(1, sizeof(molecule_t));
@@ -220,64 +230,7 @@ void read_multi_configs(system_t *system, multiConfigData_t *configs, multiParam
             memnullcheck(configs->molecules[i]->next, sizeof(molecule_t), __LINE__ - 1, __FILE__);
             configs->molecules[i]->next->atoms = NULL;
             fgets(line, sizeof(line), fp);
-            token = strtok(line, s);
-            if (safe_atof(token,&(configs->abInitioEnergy[i])))
-            {
-                error("SURFACE MULTI FIT: Unable to read ab initio energy in multi-fit configuration file.\n");
-                die(-1);
-            }
-            configs->periodic[i] = false;
-            system->pbc = configs->pbc[i];
-            system->pbc->basis[0][0] = 100000.;
-            system->pbc->basis[0][1] = 0.;
-            system->pbc->basis[0][2] = 0.;
-            system->pbc->basis[1][0] = 0.;
-            system->pbc->basis[1][1] = 100000.;
-            system->pbc->basis[1][2] = 0.;
-            system->pbc->basis[2][0] = 0.;
-            system->pbc->basis[2][1] = 0.;
-            system->pbc->basis[2][2] = 100000.;
-            pbc(system);
-            token = strtok(NULL, s);
-            if (token != NULL)
-            {
-                if (strcmp("periodic", token) == 0) {
-                    configs->periodic[i] = true;
-                    double a, b, c, alpha, beta, gamma;
-                    if (safe_atof(strtok(NULL, s), &a))
-                    {
-                        error("SURFACE MULTI FIT: Improper periodic specification in multi-fit configuration file.\n");
-                        die(-1);
-                    }
-                    if (safe_atof(strtok(NULL, s), &b))
-                    {
-                        error("SURFACE MULTI FIT: Improper periodic specification in multi-fit configuration file.\n");
-                        die(-1);
-                    }
-                    if (safe_atof(strtok(NULL, s), &c))
-                    {
-                        error("SURFACE MULTI FIT: Improper periodic specification in multi-fit configuration file.\n");
-                        die(-1);
-                    }
-                    if (safe_atof(strtok(NULL, s), &alpha))
-                    {
-                        error("SURFACE MULTI FIT: Improper periodic specification in multi-fit configuration file.\n");
-                        die(-1);
-                    }
-                    if (safe_atof(strtok(NULL, s), &beta))
-                    {
-                        error("SURFACE MULTI FIT: Improper periodic specification in multi-fit configuration file.\n");
-                        die(-1);
-                    }
-                    if (safe_atof(strtok(NULL, s), &gamma))
-                    {
-                        error("SURFACE MULTI FIT: Improper periodic specification in multi-fit configuration file.\n");
-                        die(-1);
-                    }
-                    car2basis(system, a, b, c, alpha, beta, gamma);
-                    pbc(system);
-                }
-            }
+            configs->abInitioEnergy[i] = atof(line);
         } else {
             atom_t *new_atom = calloc(1, sizeof(atom_t));
             memnullcheck(new_atom, sizeof(atom_t), __LINE__ - 1, __FILE__);
@@ -286,74 +239,67 @@ void read_multi_configs(system_t *system, multiConfigData_t *configs, multiParam
 
             // Check that each atom has a corresponding atom in the parameter file
             bool name_exists = false;
-            for (j = 0; j < params->nParams; j++)
-            {
-                if (strcasecmp(params->atomtype[j], new_atom->atomtype) == 0)
-                {
+            for (j = 0; j < params->nParams; j++) {
+                if (strcasecmp(params->atomtype[j], new_atom->atomtype) == 0) {
                     name_exists = true;
                 }
             }
-            if (!name_exists)
-            {
+            if (!name_exists) {
                 printf("SURFACE MULTI FIT: Atom in multi-fit configuration file (%s) is not specified in the atomic parameter file (input pqr).\n", new_atom->atomtype);
                 die(-1);
             }
 
             token = strtok(NULL, s);
-            if (token == NULL)
-            {
+            if (token == NULL) {
                 error("SURFACE MULTI FIT: The multi-fit configuration file is not in the correct format.\n");
                 die(-1);
             }
             int molecule_number = atoi(token);
             token = strtok(NULL, s);
-            if (token == NULL)
-            {
+            if (token == NULL) {
                 error("SURFACE MULTI FIT: The multi-fit configuration file is not in the correct format.\n");
                 die(-1);
             }
-            safe_atof(token,&(new_atom->pos[0]));
+            new_atom->pos[0] = atof(token);
             new_atom->wrapped_pos[0] = new_atom->pos[0];
             token = strtok(NULL, s);
-            if (token == NULL)
-            {
+            if (token == NULL) {
                 error("SURFACE MULTI FIT: The multi-fit configuration file is not in the correct format.\n");
                 die(-1);
             }
-            safe_atof(token,&(new_atom->pos[1]));
+            new_atom->pos[1] = atof(token);
             new_atom->wrapped_pos[1] = new_atom->pos[1];
             token = strtok(NULL, s);
-            if (token == NULL)
-            {
+            if (token == NULL) {
                 error("SURFACE MULTI FIT: The multi-fit configuration file is not in the correct format.\n");
                 die(-1);
             }
-            safe_atof(token,&(new_atom->pos[2]));
+            new_atom->pos[2] = atof(token);
             new_atom->wrapped_pos[2] = new_atom->pos[2];
             token = strtok(NULL, s);
-            if (token == NULL)
-            {
+            if (token == NULL) {
                 printf("SURFACE MULTI FIT: Charge not specified in multi-fit configuration file, defaulting to 0 charge.\n");
                 //die(-1);
                 new_atom->charge = 0;  // actually just set the charge to zero instead of dieing
-            }
-            else
-            {
-                safe_atof(token,&(new_atom->charge));
-                new_atom->charge *= E2REDUCED;
-            }
-            molecule_t *insert_in_this_molecule = configs->molecules[i];
-
-            for (j=0; j<molecule_number-1; j++)
-            {
-                if (insert_in_this_molecule->next == NULL) {
-                    insert_in_this_molecule->next = calloc(1, sizeof(molecule_t));
-                    memnullcheck(insert_in_this_molecule->next, sizeof(molecule_t), __LINE__ - 1, __FILE__);
-                    insert_in_this_molecule->next->atoms = NULL;
+            } else
+                new_atom->charge = atof(token) * E2REDUCED;
+            molecule_t *insert_in_this_molecule;
+            if (molecule_number == 1)
+                insert_in_this_molecule = configs->molecules[i];
+            else if (molecule_number == 2)
+                insert_in_this_molecule = configs->molecules[i]->next;
+            else if (molecule_number == 3) {
+                if (configs->molecules[i]->next->next == NULL) {
+                    configs->molecules[i]->next->next = calloc(1, sizeof(molecule_t));
+                    memnullcheck(configs->molecules[i]->next->next, sizeof(molecule_t), __LINE__ - 1, __FILE__);
+                    configs->molecules[i]->next->next->atoms = NULL;
                 }
-                insert_in_this_molecule = insert_in_this_molecule->next;
+                insert_in_this_molecule = configs->molecules[i]->next->next;
+            } else {
+                insert_in_this_molecule = NULL;
+                error("SURFACE MULTI FIT: Can't currently handle >3 separate molecules %s:%s\n");
+                die(-1);
             }
-
             if (insert_in_this_molecule->atoms == NULL)
                 insert_in_this_molecule->atoms = new_atom;
             else {
@@ -474,22 +420,48 @@ void perturb_multi_params(system_t *system, multiParamData_t *params) {
             }
 
             //if polarvdw is on, also adjust omega
-            if (system->polarvdw || system->disp_expansion_mbvdw) {
+/*            if (system->polarvdw || system->disp_expansion_mbvdw) {
                 if (params->omega[i] > 0.0)
-                    params->omega[i] += scale_omega * (0.5 - get_rand(system));
+                {
+                  params->omega[i] *= scale_omega*(0.5 - get_rand(system));
+//      printf("fuck");
+                }
                 if (params->omega[i] < 0.0) params->omega[i] = params->last_omega[i];
                 if (system->cdvdw_exp_repulsion) {
                     if (params->sigma[i] > 0.0)  //scale_sigma given as percentage when exp_rep is on
                         params->sigma[i] += params->sigma[i] * (scale_sigma * (0.5 - get_rand(system)));
                     if (params->sigma[i] < 0.0) params->sigma[i] = params->last_sigma[i];
                 }
-            }
-            //otherwise adjust sigma (adjust sigma in the case of disp_expansion_mbvdw as well)
-            else if (!system->polarvdw) {
+            }*/
+            //otherwise adjust sigma
+            else {
                 if (params->sigma[i] > 0.0)
                     params->sigma[i] += scale_sigma * (0.5 - get_rand(system));
                 if (params->sigma[i] < 0.0) params->sigma[i] = params->last_sigma[i];
             }
+
+            //need to adjust sigma in this case, too
+            if (system->disp_expansion_mbvdw) {
+                if (params->sigma[i] > 0.0)
+                    params->sigma[i] += scale_sigma * (0.5 - get_rand(system));
+                if (params->sigma[i] < 0.0) params->sigma[i] = params->last_sigma[i];
+            }
+
+          if (system->surf_scale_c6_on) {
+              if (params->c6[i] > 0.0)
+                {
+                  double disp_coeff_scale = 2.0*get_rand(system);
+                  params->omega[i] *= disp_coeff_scale;
+                  params->c6[i] *= (disp_coeff_scale);
+                  params->c8[i] *= (disp_coeff_scale);
+                  params->c10[i] *= (disp_coeff_scale);
+                }
+                if (params->c6[i] < 0.0) params->c6[i] = params->last_c6[i];
+                if (params->c8[i] < 0.0) params->c8[i] = params->last_c8[i];
+                if (params->c10[i] < 0.0) params->c10[i] = params->last_c10[i];
+          }
+
+/*
 
             if (system->surf_scale_c6_on) {
                 if (params->c6[i] > 0.0)
@@ -508,7 +480,7 @@ void perturb_multi_params(system_t *system, multiParamData_t *params) {
                     params->c10[i] += scale_c10 * (0.5 - get_rand(system));
                 if (params->c10[i] < 0.0) params->c10[i] = params->last_c10[i];
             }
-
+*/
             if (system->surf_scale_pol_on) {
                 if (params->polarizability[i] > 0.0)
                     params->polarizability[i] += scale_pol * (0.5 - get_rand(system));
@@ -520,7 +492,7 @@ void perturb_multi_params(system_t *system, multiParamData_t *params) {
     return;
 }
 
-double calc_multi_configurational_energy(system_t *system) {
+double energy_multi_fit(system_t *system) {
     double potential_energy, rd_energy, coulombic_energy, polar_energy, vdw_energy, three_body_energy;
 
     /* zero the initial values */
@@ -542,10 +514,7 @@ double calc_multi_configurational_energy(system_t *system) {
     if (system->polarization) {
 #ifdef CUDA
         if (system->cuda)
-        {
-            polar_cuda(system);
-            polar_energy = system->observables->polarization_energy;
-        }
+            polar_energy = (double)polar_cuda(system);
         else
             polar_energy = polar(system);
 #else
@@ -589,15 +558,36 @@ double calc_multi_configurational_energy(system_t *system) {
     return (potential_energy);
 }
 
+double calc_multi_configurational_energy(system_t *system) {
+    // This might not be needed?
+    // TODO: Probably test this I guess?
+
+    molecule_t *molecule_ptr;
+    atom_t *atom_ptr;
+    pair_t *pair_ptr;
+    int n = 0;
+
+    for (molecule_ptr = system->molecules; molecule_ptr; molecule_ptr = molecule_ptr->next)
+        for (atom_ptr = molecule_ptr->atoms; atom_ptr; atom_ptr = atom_ptr->next) {
+            n++;
+            for (pair_ptr = atom_ptr->pairs; pair_ptr; pair_ptr = pair_ptr->next)
+                pair_ptr->recalculate_energy = 1;
+        }
+
+    system->natoms = n;
+
+    return energy_multi_fit(system);
+}
+
 double calc_multi_error(system_t *system, multiConfigData_t *configs) {
     double total_error = 0.0;
     int i;
     double max_energy = system->fit_max_energy;
     double kweight = ((system->surf_weight_constant_on) ? system->surf_weight_constant : WEIGHT_CONSTANT);
+    //const double error_scale = 500.0;
 
     for (i = 0; i < configs->nConfigs; i++) {
         system->molecules = configs->molecules[i];
-        system->pbc = configs->pbc[i];
         double model_energy = calc_multi_configurational_energy(system);
         if (configs->fitEnergy[i] == MAXVALUE)
             configs->lastFitEnergy[i] = model_energy;
@@ -607,6 +597,8 @@ double calc_multi_error(system_t *system, multiConfigData_t *configs) {
         ab_initio_energy = min(ab_initio_energy, max_energy);
         double weight = exp(kweight * (max_energy - ab_initio_energy) / max_energy);
         double error = model_energy - ab_initio_energy;
+        // TODO: this needs to be an option (l1 vs l2)
+        //total_error += weight*(sqrt(error_scale*error_scale+error*error)-error_scale);
         total_error += weight * error * error;
     }
 
@@ -620,7 +612,6 @@ double calc_multi_mse(system_t *system, multiConfigData_t *configs) {
 
     for (i = 0; i < configs->nConfigs; i++) {
         system->molecules = configs->molecules[i];
-        system->pbc = configs->pbc[i];
         double current_energy = calc_multi_configurational_energy(system);
         double abInitio = configs->abInitioEnergy[i];
 
@@ -639,7 +630,6 @@ double calc_multi_mue(system_t *system, multiConfigData_t *configs) {
 
     for (i = 0; i < configs->nConfigs; i++) {
         system->molecules = configs->molecules[i];
-        system->pbc = configs->pbc[i];
         double current_energy = calc_multi_configurational_energy(system);
         double abInitio = configs->abInitioEnergy[i];
 
@@ -718,7 +708,6 @@ int surface_multi_fit(system_t *system) {
     memnullcheck(params, sizeof(multiParamData_t), __LINE__ - 1, __FILE__);
 
     molecule_t *original_molecule = system->molecules;
-    pbc_t *original_pbc = system->pbc;
     load_initial_multi_params(system, params);
     read_multi_configs(system, configs, params);
 
@@ -778,42 +767,7 @@ int surface_multi_fit(system_t *system) {
     output_best_config_energies(configs);
     printf("*****************\n");
 
-    free(params->atomtype);
-    free(params->c6);
-    free(params->last_c6);
-    free(params->c8);
-    free(params->last_c8);
-    free(params->c10);
-    free(params->last_c10);
-    free(params->epsilon);
-    free(params->last_epsilon);
-    free(params->sigma);
-    free(params->last_sigma);
-    free(params->omega);
-    free(params->last_omega);
-    free(params->polarizability);
-    free(params->last_polarizability);
-    free(params);
-
-
-    for (i=0;i<configs->nConfigs;i++)
-    {
-        free(configs->pbc[i]);
-        free_all_molecules(configs->molecules[i]);
-    }
-
-    free(configs->abInitioEnergy);
-    free(configs->fitEnergy);
-    free(configs->lastFitEnergy);
-    free(configs->molecules);
-    free(configs->periodic);
-    free(configs->pbc);
-    free(configs);
-
-    system->molecules = original_molecule;
-    system->pbc = original_pbc;
-    pbc(system);
-    pairs(system);
-
+    // TODO: free params and configs I guess
+    // TODO: do I really have to do this???
     return 0;
 }

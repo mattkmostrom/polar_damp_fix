@@ -143,6 +143,9 @@ double energy(system_t *system) {
         if (system->axilrod_teller) {
             three_body_energy = axilrod_teller(system);
             system->observables->three_body_energy = three_body_energy;
+            
+            printf(
+            "OUTPUT: Axilrod-Teller energy = %.5f K\n",three_body_energy);
         }
 
         /* get the electrostatic potential */

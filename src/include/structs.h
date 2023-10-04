@@ -3,6 +3,10 @@
 
 #include "defines.h"
 
+#ifdef OPENCL
+#include "CL/cl.h"
+#endif
+
 /* complex value */
 typedef struct _complex_t {
     double real;
@@ -211,15 +215,12 @@ typedef struct _avg_observables {
 // used for storing global sorbate averages
 typedef struct _sorbateAverages {
     double avgN, avgN_sq, avgN_err;                             // average sorbate count
-    double *avgNM;                                              // average product of sorbate counts with other sorbate counts
-    double avgUN;                                               // average product of energy * sorbate count
     double percent_wt, percent_wt_sq, percent_wt_err;           // weight percent for this sorbate (sorb_mass / total_mass)
     double percent_wt_me, percent_wt_me_sq, percent_wt_me_err;  // weight percent for this sorbate (sorb_mass / frozen_mass)
     double excess_ratio, excess_ratio_sq, excess_ratio_err;     // excess adsorption ratio
     double pore_density, pore_density_sq, pore_density_err;     // mass / volume of pore
     double density, density_sq, density_err;                    // mass of sorbate / volume
     double selectivity, selectivity_err;                        // sorbate's selectivity ratio relative to all other sorbates in the insert list.
-    double qst;                                                 // Qst for this sorbate
     struct _sorbateAverages *next;
 } sorbateAverages_t;
 
@@ -327,10 +328,30 @@ typedef struct _surf_preserve_rotation {
     double alpha1, alpha2, beta1, beta2, gamma1, gamma2;
 } surf_preserve_rotation;
 
+#ifdef OPENCL
+typedef struct _ocl {
+    /* kernel that performs a single iteration through the dipole field equations */
+    cl_context context;
+    cl_kernel kernel;
+    cl_kernel palmo_echg;
+    cl_kernel thole_estat;
+    cl_kernel potential_reduction;
+    cl_program program;
+    cl_command_queue queue;
+    cl_device_id *device_id;
+    cl_platform_id *platforms;
+
+} ocl_t;
+#endif
+
 typedef struct _system {
     int ensemble;
     int gwp;
     int cuda;
+    int opencl;
+#ifdef OPENCL
+    ocl_t *ocl;
+#endif
 
     //for manual specification of random seeds
     int preset_seeds_on;
@@ -339,13 +360,6 @@ typedef struct _system {
 
     // is this a restart of a parallel job?
     int parallel_restarts;
-
-    // the CLI arguments passed for this run
-    char **argv;
-
-    // built-in models
-    char *model_dir;
-    char **models;
 
     //surface fitting options
     int surf_fit_multi_configs;
@@ -365,6 +379,11 @@ typedef struct _system {
     int surf_preserve, surf_decomp;
     double surf_min, surf_max, surf_inc, surf_ang;
     surf_preserve_rotation *surf_preserve_rotation_on;
+    int surf_virial;
+    char *virial_output;
+    double *virial_coef;
+    double virial_tmin, virial_tmax, virial_dt;
+    int virial_npts;
     int ee_local;
     double range_eps, range_sig, step_eps, step_sig;
 
@@ -446,7 +465,7 @@ typedef struct _system {
     molecule_t **insertion_molecules_array;  // array providing direct access to elements of above list
 
     // quantum rotation stuff
-    int quantum_rotation, quantum_rotation_hindered, quantum_rotation_print_eigenspectrum;
+    int quantum_rotation, quantum_rotation_hindered;
     double quantum_rotation_B;
     double quantum_rotation_hindered_barrier;
     int quantum_rotation_level_max, quantum_rotation_l_max, quantum_rotation_theta_max, quantum_rotation_phi_max, quantum_rotation_sum;

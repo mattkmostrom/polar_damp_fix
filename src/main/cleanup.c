@@ -108,7 +108,7 @@ void free_all_pairs(system_t *system) {
 }
 
 // free all molecules
-void free_all_molecules(molecule_t *molecules) {
+void free_all_molecules(system_t *system, molecule_t *molecules) {
     int i;
     molecule_t **marray = NULL;
     molecule_t *mptr;
@@ -227,7 +227,7 @@ void cleanup(system_t *system) {
     rebuild_arrays(system);
 
     free_all_pairs(system);
-    free_all_molecules(system->molecules);
+    free_all_molecules(system, system->molecules);
 
     //free our arrays
     free(system->molecule_array);
@@ -237,6 +237,7 @@ void cleanup(system_t *system) {
     free(system->pqr_output);
     free(system->energy_output);
     free(system->energy_output_csv);
+    free(system->virial_output);
 
     if (system->surf_output) free(system->surf_output);
     if (system->traj_output) free(system->traj_output);
@@ -261,7 +262,7 @@ void cleanup(system_t *system) {
     if (system->insert_input) free(system->insert_input);
     //insert.pdb arrays and shit
     if (system->insertion_molecules_array) free(system->insertion_molecules_array);
-    if (system->insertion_molecules) free_all_molecules(system->insertion_molecules);
+    if (system->insertion_molecules) free_all_molecules(system, system->insertion_molecules);
     // free sorbate info array
     free(system->sorbateInfo);
 

@@ -335,6 +335,7 @@ void surf_perturb(system_t *system, double quadrupole, qshiftData_t *qshiftData,
             if (param_ptr->c10 > 0.0)
                 param_ptr->c10 += scale_c10 * (0.5 - get_rand(system));
             if (param_ptr->c10 < 0.0) param_ptr->c10 = param_ptr->last_c10;
+
         }
     }
     return;

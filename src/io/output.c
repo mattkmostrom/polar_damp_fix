@@ -345,7 +345,7 @@ int write_molecules(system_t *system, FILE *fp) {
     else
         ext_output = 0;
 
-    /* write PBC data */
+    /* write PBC data */  //VMD uses a weird convention which essentially reverses alpha <-> beta
     fprintf(fp,
             "CRYST1");
     fprintf(fp,
@@ -355,9 +355,9 @@ int write_molecules(system_t *system, FILE *fp) {
     fprintf(fp,
             "%9.3f", sqrt(dddotprod(pbc->basis[2], pbc->basis[2])));
     fprintf(fp,
-            "%7.2f", 180.0 / M_PI * acos(dddotprod(pbc->basis[1], pbc->basis[2]) / sqrt(dddotprod(pbc->basis[1], pbc->basis[1]) * dddotprod(pbc->basis[2], pbc->basis[2]))));
-    fprintf(fp,
             "%7.2f", 180.0 / M_PI * acos(dddotprod(pbc->basis[2], pbc->basis[0]) / sqrt(dddotprod(pbc->basis[0], pbc->basis[0]) * dddotprod(pbc->basis[2], pbc->basis[2]))));
+    fprintf(fp,
+            "%7.2f", 180.0 / M_PI * acos(dddotprod(pbc->basis[1], pbc->basis[2]) / sqrt(dddotprod(pbc->basis[1], pbc->basis[1]) * dddotprod(pbc->basis[2], pbc->basis[2]))));
     fprintf(fp,
             "%7.2f", 180.0 / M_PI * acos(dddotprod(pbc->basis[0], pbc->basis[1]) / sqrt(dddotprod(pbc->basis[1], pbc->basis[1]) * dddotprod(pbc->basis[0], pbc->basis[0]))));
     fprintf(fp,
@@ -1230,6 +1230,7 @@ int write_averages(system_t *system) {
     printf(
         "OUTPUT: (coupled-dipole) vdw energy = %.5f +- %.5f K\n",
         averages->vdw_energy, averages->vdw_energy_error);
+
 #endif
 
     if (averages->kinetic_energy > 0.0) {
@@ -1325,11 +1326,6 @@ int write_averages(system_t *system) {
                     "             wt_%%(%s)(ME)= %.5lf +- %.5le %%\n",
                     system->sorbateInfo[i].id, system->sorbateGlobal[i].percent_wt_me,
                     system->sorbateGlobal[i].percent_wt_me_err);
-                if (system->sorbateGlobal[i].qst > 0) {
-                    printf(
-                            "             Qst(%s)= %.5lf kJ/mol\n",
-                            system->sorbateInfo[i].id, system->sorbateGlobal[i].qst);
-                }
             }
             printf(
                 "             Selectivity(%s)= %.4lf +- %.4lf\n",
@@ -1345,4 +1341,30 @@ int write_averages(system_t *system) {
     return (0);
 }
 
+void write_virial_output(system_t *system, double tmin, double tmax, double dt) {
+    double t;
+    int i;
+    FILE *fvirial = fopen(system->virial_output,
+                          "w");
+    filecheck(fvirial, system->virial_output, WRITE);
 
+    printf(
+        "### Start Virial Output ###\n");
+    printf(
+        "#Temperature #B_2\n");
+    fprintf(fvirial,
+            "#Temperature #B_2\n");
+
+    for (i = 0, t = tmin; t <= tmax; t += dt) {
+        printf(
+            "%8.3lf %15.10lf\n", t, system->virial_coef[i]);
+        fprintf(fvirial,
+                "%8.3lf %15.10lf\n", t, system->virial_coef[i++]);
+    }
+
+    printf(
+        "### End Virial Output ###\n");
+    fclose(fvirial);
+
+    return;
+}

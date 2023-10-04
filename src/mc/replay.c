@@ -31,19 +31,21 @@ int replay_trajectory(system_t* system) {
             return (-1);
         }
 
+    int i = 0;
     while (1) {
         //remove old structures from previous loop or from input.c prior to calling this function
         free_all_pairs(system);
-        free_all_molecules(system->molecules);
+        free_all_molecules(system, system->molecules);
         if (system->insertion_molecules_array) {
             free(system->insertion_molecules_array);
             system->insertion_molecules_array = NULL;
         }
         if (system->insertion_molecules) {
-            free_all_molecules(system->insertion_molecules);
+            free_all_molecules(system, system->insertion_molecules);
             system->insertion_molecules = NULL;
         }
 
+        printf("LOOK HERE IDIOTS: %d\n",i++);
         errchk = setup_simulation_box(finput, system);
         if (errchk == 1)  //if 1, we are out of molecules
             break;

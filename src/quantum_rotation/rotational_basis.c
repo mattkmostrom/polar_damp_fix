@@ -13,7 +13,7 @@ University of South Florida
 /* (doing something slick like a func ptr array [l][m] would be just as ugly) */
 double rotational_basis(int type, int l, int m, double theta, double phi) {
     int m_abs;
-    double legendre, Ylm = 0.;
+    double legendre, Ylm;
 
     /* calculate the prefactor*legendre part */
     m_abs = abs(m);

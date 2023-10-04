@@ -51,6 +51,7 @@ void thole_amatrix(system_t *system) {
     l3 = l2 * l;
     double explr;  //exp(-l*r)
     double explrcut = exp(-l * rcut);
+    double u;
 
     //array of atoms generated in pairs.c
     atom_array = system->atom_array;
@@ -90,9 +91,6 @@ void thole_amatrix(system_t *system) {
             //evaluate damping factors
             switch (system->damp_type) {
                 case DAMPING_OFF:
-                    if (pair_ptr->es_excluded)
-                        damp1 = damp2 = wdamp1 = wdamp2 = 0.0;
-                    else
                         damp1 = damp2 = wdamp1 = wdamp2 = 1.0;
                     break;
                 case DAMPING_LINEAR:
@@ -114,7 +112,17 @@ void thole_amatrix(system_t *system) {
                         wdamp2 = wdamp1 - explrcut * (l3 * rcut3 / 6.0);
                     }
                     break;
-                default:
+                case DAMPING_EXPONENTIAL_FIXED:
+                    u = r / pow(atom_array[i]->polarizability * atom_array[j]->polarizability, 1.0 / 6.0);
+                    explr = exp(-l * u);
+		    damp1 = 1.0 - explr * (0.5 * l2 * (u*u) + l * u + 1.0);
+                    damp2 = damp1 - explr * (l3 * (u*u*u) / 6.0);
+                    if (system->polar_wolf_full) {  //subtract off damped interaction at r_cutoff
+                        wdamp1 = 1.0 - explrcut * (0.5 * l2 * rcut2 + l * rcut + 1.0);
+                        wdamp2 = wdamp1 - explrcut * (l3 * rcut3 / 6.0);
+                    }
+                    break;
+		default:
                     error(
                         "error: something unexpected happened in thole_matrix.c");
             }
